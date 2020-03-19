@@ -1079,17 +1079,17 @@ void D3D12Replay::FillRegisterSpaces(const D3D12RenderState::RootSignature &root
 
             // the size is however many registers are between the base of this range and that last
             // bind, plus the size of the bind (at least 1 if it's not arrayed).
-            // If we didn't find any bind, clamp to 128 instead to prevent massive descriptor heaps
-            // from being passed through.
+            // If we didn't find any bind, use the number of descriptors that the heap can fit, to
+            // try to provide full information.
             if(bind)
             {
-              uint32_t arraySize = bind->arraySize == UINT_MAX ? 0U : bind->arraySize;
+              uint32_t arraySize = bind->arraySize == UINT_MAX ? availDescriptors : bind->arraySize;
               num = RDCMIN(availDescriptors,
                            bind->bind - range.BaseShaderRegister + RDCMAX(1U, arraySize));
             }
             else
             {
-              num = RDCMIN(availDescriptors, 128U);
+              num = availDescriptors;
             }
           }
         }
@@ -1174,6 +1174,7 @@ void D3D12Replay::FillRegisterSpaces(const D3D12RenderState::RootSignature &root
           {
             D3D12Pipe::View &view = regSpace.srvs[shaderReg];
             view.immediate = false;
+            view.largeTableEntry = (num > 128);
             view.rootElement = (uint32_t)rootEl;
             view.tableIndex = offset + i;
 
@@ -1195,6 +1196,7 @@ void D3D12Replay::FillRegisterSpaces(const D3D12RenderState::RootSignature &root
           {
             D3D12Pipe::View &view = regSpace.uavs[shaderReg];
             view.immediate = false;
+            view.largeTableEntry = (num > 128);
             view.rootElement = (uint32_t)rootEl;
             view.tableIndex = offset + i;
 

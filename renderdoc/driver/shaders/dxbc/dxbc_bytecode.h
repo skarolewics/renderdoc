@@ -38,6 +38,11 @@ class IDebugInfo;
 struct Reflection;
 };
 
+namespace DXBCDebug
+{
+struct BindingSlot;
+};
+
 namespace DXBCBytecode
 {
 /////////////////////////////////////////////////////////////////////////
@@ -966,6 +971,8 @@ public:
   size_t GetNumDeclarations() const { return m_Declarations.size(); }
   const Declaration &GetDeclaration(size_t i) const { return m_Declarations[i]; }
   const Declaration *FindDeclaration(OperandType declType, uint32_t identifier) const;
+  uint32_t GetLogicalIdentifierForBindingSlot(OperandType declType,
+                                              const DXBCDebug::BindingSlot &slot) const;
   size_t GetNumInstructions() const { return m_Instructions.size(); }
   const Operation &GetInstruction(size_t i) const { return m_Instructions[i]; }
   const rdcarray<uint32_t> &GetImmediateConstantBuffer() const { return m_Immediate; }

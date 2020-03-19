@@ -101,27 +101,34 @@ void Following::GetDrawContext(ICaptureContext &ctx, bool &copy, bool &clear, bo
             ctx.CurPipelineState().GetShader(ShaderStage::Compute) != ResourceId();
 }
 
-int Following::GetHighestMip(ICaptureContext &ctx)
+int Following::GetHighestMip(ICaptureContext &ctx, const rdcarray<BoundResourceArray> &readOnly,
+                             const rdcarray<BoundResourceArray> &readWrite)
 {
-  return GetBoundResource(ctx, arrayEl).firstMip;
+  return GetBoundResource(ctx, readOnly, readWrite, arrayEl).firstMip;
 }
 
-int Following::GetFirstArraySlice(ICaptureContext &ctx)
+int Following::GetFirstArraySlice(ICaptureContext &ctx, const rdcarray<BoundResourceArray> &readOnly,
+                                  const rdcarray<BoundResourceArray> &readWrite)
 {
-  return GetBoundResource(ctx, arrayEl).firstSlice;
+  return GetBoundResource(ctx, readOnly, readWrite, arrayEl).firstSlice;
 }
 
-CompType Following::GetTypeHint(ICaptureContext &ctx)
+CompType Following::GetTypeHint(ICaptureContext &ctx, const rdcarray<BoundResourceArray> &readOnly,
+                                const rdcarray<BoundResourceArray> &readWrite)
 {
-  return GetBoundResource(ctx, arrayEl).typeCast;
+  return GetBoundResource(ctx, readOnly, readWrite, arrayEl).typeCast;
 }
 
-ResourceId Following::GetResourceId(ICaptureContext &ctx)
+ResourceId Following::GetResourceId(ICaptureContext &ctx,
+                                    const rdcarray<BoundResourceArray> &readOnly,
+                                    const rdcarray<BoundResourceArray> &readWrite)
 {
-  return GetBoundResource(ctx, arrayEl).resourceId;
+  return GetBoundResource(ctx, readOnly, readWrite, arrayEl).resourceId;
 }
 
-BoundResource Following::GetBoundResource(ICaptureContext &ctx, int arrayIdx)
+BoundResource Following::GetBoundResource(ICaptureContext &ctx,
+                                          const rdcarray<BoundResourceArray> &readOnly,
+                                          const rdcarray<BoundResourceArray> &readWrite, int arrayIdx)
 {
   BoundResource ret;
 
@@ -138,7 +145,7 @@ BoundResource Following::GetBoundResource(ICaptureContext &ctx, int arrayIdx)
   }
   else if(Type == FollowType::ReadWrite)
   {
-    rdcarray<BoundResourceArray> rw = GetReadWriteResources(ctx);
+    // rdcarray<BoundResourceArray> rw = GetReadWriteResources(ctx);
 
     ShaderBindpointMapping mapping = GetMapping(ctx);
 
@@ -146,14 +153,14 @@ BoundResource Following::GetBoundResource(ICaptureContext &ctx, int arrayIdx)
     {
       Bindpoint &key = mapping.readWriteResources[index];
 
-      int residx = rw.indexOf(key);
+      int residx = readWrite.indexOf(key);
       if(residx >= 0)
-        ret = rw[residx].resources[arrayIdx];
+        ret = readWrite[residx].resources[arrayIdx];
     }
   }
   else if(Type == FollowType::ReadOnly)
   {
-    rdcarray<BoundResourceArray> ro = GetReadOnlyResources(ctx);
+    // rdcarray<BoundResourceArray> ro = GetReadOnlyResources(ctx);
 
     ShaderBindpointMapping mapping = GetMapping(ctx);
 
@@ -161,9 +168,9 @@ BoundResource Following::GetBoundResource(ICaptureContext &ctx, int arrayIdx)
     {
       Bindpoint &key = mapping.readOnlyResources[index];
 
-      int residx = ro.indexOf(key);
+      int residx = readOnly.indexOf(key);
       if(residx >= 0)
-        ret = ro[residx].resources[arrayIdx];
+        ret = readOnly[residx].resources[arrayIdx];
     }
   }
 
@@ -479,7 +486,7 @@ void TextureViewer::UI_UpdateCachedTexture()
 
   ResourceId id = m_LockedId;
   if(id == ResourceId())
-    id = m_Following.GetResourceId(m_Ctx);
+    id = m_Following.GetResourceId(m_Ctx, m_ReadOnlyResources, m_ReadWriteResources);
 
   if(id == ResourceId())
     id = m_TexDisplay.resourceId;
@@ -1128,7 +1135,7 @@ void TextureViewer::UI_UpdateTextureDetails()
 
   TextureDescription &current = *texptr;
 
-  ResourceId followID = m_Following.GetResourceId(m_Ctx);
+  ResourceId followID = m_Following.GetResourceId(m_Ctx, m_ReadOnlyResources, m_ReadWriteResources);
 
   {
     TextureDescription *followtex = m_Ctx.GetTexture(followID);
@@ -1274,7 +1281,7 @@ void TextureViewer::UI_OnTextureSelectionChanged(bool newdraw)
 
   // interpret the texture according to the currently following type.
   if(!currentTextureIsLocked())
-    m_TexDisplay.typeCast = m_Following.GetTypeHint(m_Ctx);
+    m_TexDisplay.typeCast = m_Following.GetTypeHint(m_Ctx, m_ReadOnlyResources, m_ReadWriteResources);
   else
     m_TexDisplay.typeCast = CompType::Typeless;
 
@@ -1412,7 +1419,7 @@ void TextureViewer::UI_OnTextureSelectionChanged(bool newdraw)
 
     // only switch to the selected mip for outputs, and when changing drawcall
     if(!currentTextureIsLocked() && m_Following.Type != FollowType::ReadOnly && newdraw)
-      highestMip = m_Following.GetHighestMip(m_Ctx);
+      highestMip = m_Following.GetHighestMip(m_Ctx, m_ReadOnlyResources, m_ReadWriteResources);
 
     // assuming we get a valid mip for the highest mip, only switch to it
     // if we've selected a new texture, or if it's different than the last mip.
@@ -1436,7 +1443,8 @@ void TextureViewer::UI_OnTextureSelectionChanged(bool newdraw)
     int firstArraySlice = -1;
     // only switch to the selected mip for outputs, and when changing drawcall
     if(!currentTextureIsLocked() && m_Following.Type != FollowType::ReadOnly && newdraw)
-      firstArraySlice = m_Following.GetFirstArraySlice(m_Ctx);
+      firstArraySlice =
+          m_Following.GetFirstArraySlice(m_Ctx, m_ReadOnlyResources, m_ReadWriteResources);
 
     // see above with highestMip and prevHighestMip for the logic behind this
     if(firstArraySlice >= 0 && (newtex || firstArraySlice != m_PrevFirstArraySlice))
@@ -2263,7 +2271,10 @@ void TextureViewer::InitStageResourcePreviews(ShaderStage stage,
 
     const bool collapseArray = dynamicallyUsedResCount > 20;
 
-    const int arrayLen = resArray != NULL ? resArray->count() : 1;
+    int arrayLen = resArray != NULL ? resArray->count() : 1;
+
+    // hack: too many texture previews can hang my computer
+    arrayLen = std::min(16, arrayLen);
 
     for(int arrayIdx = 0; arrayIdx < arrayLen; arrayIdx++)
     {
@@ -2303,7 +2314,7 @@ void TextureViewer::InitStageResourcePreviews(ShaderStage stage,
       if(collapseArray)
         slotName += QFormatStr(" Arr[%1]").arg(arrayLen);
       else
-        slotName += QFormatStr("[%1]").arg(arrayIdx);
+        slotName += QFormatStr("[%1]").arg(res.bind);
 
       if(copy)
         slotName = tr("SRC");
@@ -2353,7 +2364,7 @@ void TextureViewer::thumb_doubleClicked(QMouseEvent *e)
 {
   if(e->buttons() & Qt::LeftButton)
   {
-    ResourceId id = m_Following.GetResourceId(m_Ctx);
+    ResourceId id = m_Following.GetResourceId(m_Ctx, m_ReadOnlyResources, m_ReadWriteResources);
 
     if(id != ResourceId())
       ViewTexture(id, false);
@@ -2379,7 +2390,7 @@ void TextureViewer::thumb_clicked(QMouseEvent *e)
 
     UI_UpdateCachedTexture();
 
-    ResourceId id = m_Following.GetResourceId(m_Ctx);
+    ResourceId id = m_Following.GetResourceId(m_Ctx, m_ReadOnlyResources, m_ReadWriteResources);
 
     if(id != ResourceId())
     {
@@ -2394,7 +2405,7 @@ void TextureViewer::thumb_clicked(QMouseEvent *e)
 
     Following follow = prev->property("f").value<Following>();
 
-    ResourceId id = follow.GetResourceId(m_Ctx);
+    ResourceId id = follow.GetResourceId(m_Ctx, m_ReadOnlyResources, m_ReadWriteResources);
 
     if(id == ResourceId() && follow == m_Following)
       id = m_TexDisplay.resourceId;
@@ -2995,18 +3006,19 @@ void TextureViewer::OnEventChanged(uint32_t eventId)
   {
     ShaderStage stage = stages[i];
 
-    rdcarray<BoundResourceArray> RWs = Following::GetReadWriteResources(m_Ctx, stage);
-    rdcarray<BoundResourceArray> ROs = Following::GetReadOnlyResources(m_Ctx, stage);
+    m_ReadWriteResources = Following::GetReadWriteResources(m_Ctx, stage);
+    m_ReadOnlyResources = Following::GetReadOnlyResources(m_Ctx, stage);
 
     const ShaderReflection *details = Following::GetReflection(m_Ctx, stage);
     const ShaderBindpointMapping &mapping = Following::GetMapping(m_Ctx, stage);
 
     InitStageResourcePreviews(stage, details != NULL ? details->readWriteResources : empty,
-                              mapping.readWriteResources, RWs, ui->outputThumbs, outIndex, copy,
-                              true);
+                              mapping.readWriteResources, m_ReadWriteResources, ui->outputThumbs,
+                              outIndex, copy, true);
 
     InitStageResourcePreviews(stage, details != NULL ? details->readOnlyResources : empty,
-                              mapping.readOnlyResources, ROs, ui->inputThumbs, inIndex, copy, false);
+                              mapping.readOnlyResources, m_ReadOnlyResources, ui->inputThumbs,
+                              inIndex, copy, false);
   }
 
   // hide others

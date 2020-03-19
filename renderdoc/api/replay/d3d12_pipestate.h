@@ -243,6 +243,13 @@ struct View
   }
   DOCUMENT("``True`` if this view is a root parameter (i.e. not in a table).");
   bool immediate = false;
+  // TODO: Add a bool field here to indicate whether it was from a bindless table
+  // This is needed so that giant bindless tabels don't add a bunch of resource rows
+  // which tanks perf in the pipeline state viewer. For single bindings, seeing that
+  // no resource is bound is more helpful than omitting it from the list.
+  DOCUMENT(R"(``True`` if this view is bound via a descriptor table that contains a large
+number of entries.)");
+  bool largeTableEntry = false;
   DOCUMENT("The index in the original root signature that this descriptor came from.");
   uint32_t rootElement = ~0U;
   DOCUMENT("The index in the the parent descriptor table where this descriptor came from.");

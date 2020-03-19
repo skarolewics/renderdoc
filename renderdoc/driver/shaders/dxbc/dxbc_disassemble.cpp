@@ -30,6 +30,7 @@
 #include "serialise/serialiser.h"
 #include "strings/string_utils.h"
 #include "dxbc_bytecode.h"
+#include "dxbc_debug.h"
 
 #include "dxbc_container.h"
 
@@ -2124,6 +2125,29 @@ const Declaration *Program::FindDeclaration(OperandType declType, uint32_t ident
   }
 
   return NULL;
+}
+
+// TODO: Consider moving BindingSlot out of debug namespace
+uint32_t Program::GetLogicalIdentifierForBindingSlot(OperandType declType,
+                                                     const DXBCDebug::BindingSlot &slot) const
+{
+  // Prior to SM 5.1, the shader register is the identifier
+  if(!IsShaderModel51())
+    return slot.shaderRegister;
+
+  size_t numDeclarations = m_Declarations.size();
+  for(size_t i = 0; i < numDeclarations; ++i)
+  {
+    const Declaration &decl = m_Declarations[i];
+    if(decl.operand.type == declType && decl.space == slot.registerSpace &&
+       decl.operand.indices[1].index <= slot.shaderRegister &&
+       decl.operand.indices[2].index >= slot.shaderRegister)
+    {
+      return (uint32_t)decl.operand.indices[0].index;
+    }
+  }
+
+  return ~0U;
 }
 
 bool Program::ExtractOperation(uint32_t *&tokenStream, Operation &retOp, bool friendlyName)

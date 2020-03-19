@@ -3752,6 +3752,7 @@ void ThreadState::StepNext(ShaderDebugState *state, DebugAPIWrapper *apiWrapper,
       // Default assumptions for bindings
       BindingSlot resourceBinding((uint32_t)op.operands[2].indices[0].index, 0);
       BindingSlot samplerBinding(0, 0);
+      const Declaration *pResourceDecl = NULL;
 
       for(size_t i = 0; i < program->GetNumDeclarations(); i++)
       {
@@ -3768,6 +3769,7 @@ void ThreadState::StepNext(ShaderDebugState *state, DebugAPIWrapper *apiWrapper,
         {
           resourceDim = decl.dim;
 
+          pResourceDecl = &decl;
           resourceBinding = GetBindingSlotForDeclaration(*program, decl);
           GlobalState::SRVIterator srv = global.srvs.find(resourceBinding);
           if(srv == global.srvs.end())
@@ -3826,6 +3828,7 @@ void ThreadState::StepNext(ShaderDebugState *state, DebugAPIWrapper *apiWrapper,
           resourceRetType = decl.resType[0];
           sampleCount = decl.sampleCount;
 
+          pResourceDecl = &decl;
           resourceBinding = GetBindingSlotForDeclaration(*program, decl);
 
           // With SM5.1, resource arrays need to offset the shader register by the array index
@@ -3913,6 +3916,61 @@ void ThreadState::StepNext(ShaderDebugState *state, DebugAPIWrapper *apiWrapper,
       float samplerBias = 0.0f;
       if(op.operation == OPCODE_SAMPLE_B)
         samplerBias = srcOpers[3].value.f.x;
+
+      // Mark the resources as used by the instruction
+      if(state)
+      {
+        uint32_t srvIdx = program->GetLogicalIdentifierForBindingSlot(TYPE_RESOURCE, resourceBinding);
+        uint32_t reflIdx = ~0U;
+        for(uint32_t i = 0; i < (uint32_t)reflection->SRVs.size(); ++i)
+        {
+          const DXBC::ShaderInputBind &srv = reflection->SRVs[i];
+          if(srv.space == resourceBinding.registerSpace &&
+             (srv.bindCount == ~0U || (srv.reg <= resourceBinding.shaderRegister &&
+                                       resourceBinding.shaderRegister <= srv.reg + srv.bindCount)))
+          {
+            reflIdx = i;
+            break;
+          }
+        }
+
+        SourceVariableMapping sourcemap;
+        sourcemap.name = reflection->SRVs[reflIdx].name;
+        sourcemap.type = VarType::Float;
+
+        uint32_t declBaseReg = program->IsShaderModel51()
+                                   ? (uint32_t)pResourceDecl->operand.indices[1].index
+                                   : (uint32_t)pResourceDecl->operand.indices[0].index;
+        sourcemap.rows = declBaseReg;
+        sourcemap.columns = resourceBinding.registerSpace;
+        sourcemap.offset = resourceBinding.shaderRegister - declBaseReg;
+
+        rdcstr identifier;
+
+        // TODO: Should do a better way of matching resources than by name
+        if(reflection->SRVs[reflIdx].bindCount == 1)
+        {
+          if(program->IsShaderModel51())
+            identifier = StringFormat::Fmt("T%u", srvIdx);
+          else
+            identifier = StringFormat::Fmt("t%u", resourceBinding.shaderRegister);
+        }
+        else
+        {
+          if(program->IsShaderModel51())
+            identifier = StringFormat::Fmt("T%u[%u]", srvIdx, sourcemap.offset);
+          else
+            identifier =
+                StringFormat::Fmt("t%u[%u]", resourceBinding.shaderRegister, sourcemap.offset);
+        }
+
+        DebugVariableReference ref;
+        ref.type = DebugVariableType::ReadOnlyResource;
+        ref.name = identifier;
+        sourcemap.variables.push_back(ref);
+
+        state->accessedResources.push_back(sourcemap);
+      }
 
       SampleGatherResourceData resourceData;
       resourceData.dim = resourceDim;
@@ -4292,24 +4350,8 @@ void AddCBufferToGlobalState(const DXBCBytecode::Program &program, GlobalState &
                            : global.constantBlocks[i].members;
       RDCASSERTMSG("Reassigning previously filled cbuffer", targetVars.empty());
 
-      uint32_t cbufferIndex = slot.shaderRegister;
-      if(program.IsShaderModel51())
-      {
-        // Need to lookup the logical identifier from the declarations
-        size_t numDeclarations = program.GetNumDeclarations();
-        for(size_t d = 0; d < numDeclarations; ++d)
-        {
-          const DXBCBytecode::Declaration &decl = program.GetDeclaration(d);
-          if(decl.operand.type == DXBCBytecode::TYPE_CONSTANT_BUFFER &&
-             decl.space == slot.registerSpace &&
-             decl.operand.indices[1].index <= slot.shaderRegister &&
-             decl.operand.indices[2].index >= slot.shaderRegister)
-          {
-            cbufferIndex = (uint32_t)decl.operand.indices[0].index;
-            break;
-          }
-        }
-      }
+      uint32_t cbufferIndex =
+          program.GetLogicalIdentifierForBindingSlot(DXBCBytecode::TYPE_CONSTANT_BUFFER, slot);
 
       global.constantBlocks[i].name =
           program.GetRegisterName(DXBCBytecode::TYPE_CONSTANT_BUFFER, cbufferIndex);

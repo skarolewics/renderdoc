@@ -323,6 +323,11 @@ void ShaderViewer::editShader(bool customShader, ShaderStage stage, const QStrin
   }
 }
 
+bool SortBoundResources(const BoundResource &res1, const BoundResource &res2)
+{
+  return res1.bind < res2.bind;
+}
+
 void ShaderViewer::debugShader(const ShaderBindpointMapping *bind, const ShaderReflection *shader,
                                ResourceId pipeline, ShaderDebugTrace *trace,
                                const QString &debugContext)
@@ -621,6 +626,81 @@ void ShaderViewer::debugShader(const ShaderBindpointMapping *bind, const ShaderR
       r->SetFrameEvent(m_Ctx.CurEvent(), true);
 
       m_States = states;
+
+      m_ReadOnlyResources = m_Ctx.CurPipelineState().GetReadOnlyResources(m_Stage);
+
+      // Remove any fetched resource array data, so we can repopulate it with only
+      // the values accessed by the shader
+      for(size_t i = 0; i < m_ReadOnlyResources.size(); ++i)
+        m_ReadOnlyResources[i].resources.clear();
+
+      // Walk through the states to find accessed resources
+      size_t numStates = m_States.size();
+      for(size_t s = 0; s < numStates; ++s)
+      {
+        if(m_States[s].flags & ShaderEvents::SampleLoadGather)
+        {
+          for(size_t r2 = 0; r2 < m_States[s].accessedResources.size(); ++r2)
+          {
+            const SourceVariableMapping &res = m_States[s].accessedResources[r2];
+            uint32_t shaderReg = res.rows + res.offset;
+
+            if(res.variables[0].type == DebugVariableType::ReadOnlyResource)
+            {
+              // Check whether this bind has already been added
+              bool foundBind = false, dupe = false;
+              size_t resIdx = 0;
+              for(; resIdx < m_ReadOnlyResources.size(); ++resIdx)
+              {
+                const Bindpoint &bind = m_ReadOnlyResources[resIdx].bindPoint;
+                if((uint32_t)bind.bindset == res.columns && (uint32_t)bind.bind <= shaderReg &&
+                   (bind.arraySize == ~0U || shaderReg <= bind.bind + bind.arraySize))
+                {
+                  foundBind = true;
+                  for(size_t i = 0; i < m_ReadOnlyResources[resIdx].resources.size(); ++i)
+                  {
+                    if((uint32_t)m_ReadOnlyResources[resIdx].resources[i].bind == res.offset)
+                    {
+                      dupe = true;
+                      break;
+                    }
+                  }
+                  break;
+                }
+              }
+
+              if(foundBind && !dupe)
+              {
+                BoundResource boundRes =
+                    m_Ctx.CurPipelineState().GetReadOnlyResource(m_Stage, res.columns, shaderReg);
+                if(boundRes.resourceId != ResourceId())
+                {
+                  boundRes.bind = res.offset;
+                  for(size_t a = 0; a < m_ReadOnlyResources.size(); ++a)
+                  {
+                    const Bindpoint &bind = m_ReadOnlyResources[a].bindPoint;
+                    if((uint32_t)bind.bindset == res.columns && (uint32_t)bind.bind <= shaderReg &&
+                       (bind.arraySize == ~0U || shaderReg <= bind.bind + bind.arraySize))
+                    {
+                      m_ReadOnlyResources[a].resources.push_back(boundRes);
+                      break;
+                    }
+                  }
+                }
+              }
+            }
+            else if(res.variables[0].type == DebugVariableType::ReadWriteResource)
+            {
+              // TODO: ReadWriteResources
+            }
+          }
+        }
+      }
+
+      // Sort the accessed resources
+      for(size_t i = 0; i < m_ReadOnlyResources.size(); ++i)
+        std::sort(m_ReadOnlyResources[i].resources.begin(), m_ReadOnlyResources[i].resources.end(),
+                  SortBoundResources);
 
       for(const ShaderVariableChange &c : GetCurrentState().changes)
         m_Variables.push_back(c.after);
@@ -2756,7 +2836,7 @@ RDTreeWidgetItem *ShaderViewer::makeSourceVariableNode(const SourceVariableMappi
         typeName = isReadOnlyResource ? lit("Resource") : lit("RW Resource");
 
         rdcarray<BoundResourceArray> resList =
-            isReadOnlyResource ? m_Ctx.CurPipelineState().GetReadOnlyResources(m_Stage)
+            isReadOnlyResource ? m_ReadOnlyResources
                                : m_Ctx.CurPipelineState().GetReadWriteResources(m_Stage);
 
         uint32_t idx = reg->value.u.x;
@@ -2780,23 +2860,22 @@ RDTreeWidgetItem *ShaderViewer::makeSourceVariableNode(const SourceVariableMappi
         {
           value = ToQStr(res.resources[0].resourceId);
         }
-        else if(bind.arraySize == ~0U)
-        {
-          regNames = QString();
-          typeName = lit("[unbounded]");
-          value = QString();
-        }
         else
         {
-          for(uint32_t a = 0; a < bind.arraySize; a++)
+          for(uint32_t a = 0; a < res.resources.size(); a++)
             children.push_back(new RDTreeWidgetItem({
-                QFormatStr("%1[%2]").arg(localName).arg(a), QFormatStr("%1[%2]").arg(regNames).arg(a),
-                typeName, ToQStr(res.resources[a].resourceId),
+                QFormatStr("%1[%2]").arg(localName).arg(res.resources[a].bind),
+                QFormatStr("%1[%2]").arg(regNames).arg(res.resources[a].bind), typeName,
+                ToQStr(res.resources[a].resourceId),
             }));
 
           regNames = QString();
-          typeName = QFormatStr("[%1]").arg(bind.arraySize);
           value = QString();
+
+          if(bind.arraySize == ~0U)
+            typeName = lit("[unbounded]");
+          else
+            typeName = QFormatStr("[%1]").arg(bind.arraySize);
         }
       }
       else

@@ -393,9 +393,10 @@ void DoSerialise(SerialiserType &ser, ShaderDebugState &el)
   SERIALISE_MEMBER(flags);
   SERIALISE_MEMBER(changes);
   SERIALISE_MEMBER(sourceVars);
+  SERIALISE_MEMBER(accessedResources);
   SERIALISE_MEMBER(callstack);
 
-  SIZE_CHECK(88);
+  SIZE_CHECK(112);
 }
 
 template <typename SerialiserType>

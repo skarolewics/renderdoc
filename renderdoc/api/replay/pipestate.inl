@@ -1003,6 +1003,45 @@ BoundCBuffer PipeState::GetConstantBuffer(ShaderStage stage, uint32_t BufIdx, ui
   return ret;
 }
 
+BoundResource PipeState::GetReadOnlyResource(ShaderStage stage, uint32_t bindset, uint32_t bind) const
+{
+  if(IsCaptureLoaded())
+  {
+    if(IsCaptureD3D11())
+    {
+      // TODO
+    }
+    else if(IsCaptureD3D12())
+    {
+      const D3D12Pipe::Shader &s = GetD3D12Stage(stage);
+
+      for(size_t space = 0; space < s.spaces.count(); ++space)
+      {
+        if(s.spaces[space].spaceIndex == bindset)
+        {
+          if(s.spaces[space].srvs.size() >= bind)
+          {
+            const D3D12Pipe::View &view = s.spaces[space].srvs[bind];
+
+            BoundResource res;
+            res.resourceId = view.resourceId;
+            res.firstMip = (int)view.firstMip;
+            res.firstSlice = (int)view.firstSlice;
+            res.typeCast = view.viewFormat.compType;
+            return res;
+          }
+          else
+          {
+            return BoundResource();
+          }
+        }
+      }
+    }
+    // TODO: GL/Vulkan
+  }
+  return BoundResource();
+}
+
 rdcarray<BoundResourceArray> PipeState::GetReadOnlyResources(ShaderStage stage) const
 {
   rdcarray<BoundResourceArray> ret;
@@ -1043,10 +1082,9 @@ rdcarray<BoundResourceArray> PipeState::GetReadOnlyResources(ShaderStage stage) 
         ret.push_back(BoundResourceArray());
         ret.back().bindPoint = bind;
 
-        uint32_t count = bind.arraySize == ~0U ? 1 : bind.arraySize;
-        rdcarray<BoundResource> &val = ret.back().resources;
-        val.resize(count);
-
+        // TODO: Some views want to fill this out, others (notably the shader viewer) only want
+        // to list what was referenced. Need a way to separate
+        //#if 0
         int spaceIndex = 0;
         for(int space = 0; space < s.spaces.count(); space++)
         {
@@ -1057,15 +1095,29 @@ rdcarray<BoundResourceArray> PipeState::GetReadOnlyResources(ShaderStage stage) 
           }
         }
 
-        for(uint32_t i = 0; i < count; i++)
-        {
-          const D3D12Pipe::View &view = s.spaces[spaceIndex].srvs[bind.bind + i];
+        uint32_t start = bind.bind;
+        uint32_t spaceEnd = (uint32_t)s.spaces[spaceIndex].srvs.size();
+        uint32_t end =
+            (bind.arraySize == ~0U) ? spaceEnd : std::min(spaceEnd, bind.bind + bind.arraySize);
 
-          val[i].resourceId = view.resourceId;
-          val[i].firstMip = (int)view.firstMip;
-          val[i].firstSlice = (int)view.firstSlice;
-          val[i].typeCast = view.viewFormat.compType;
+        rdcarray<BoundResource> &val = ret.back().resources;
+        val.reserve(end - start);
+
+        for(uint32_t i = 0, idx = start; idx < end; ++i, ++idx)
+        {
+          const D3D12Pipe::View &view = s.spaces[spaceIndex].srvs[idx];
+          if(view.resourceId != ResourceId())
+          {
+            val.push_back(BoundResource());
+            BoundResource &res = val.back();
+            res.bind = i;
+            res.resourceId = view.resourceId;
+            res.firstMip = (int)view.firstMip;
+            res.firstSlice = (int)view.firstSlice;
+            res.typeCast = view.viewFormat.compType;
+          }
         }
+        //#endif
       }
 
       return ret;

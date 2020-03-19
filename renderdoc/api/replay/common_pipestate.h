@@ -244,6 +244,7 @@ struct BoundResource
     firstMip = -1;
     firstSlice = -1;
     typeCast = CompType::Typeless;
+    bind = 0;
   }
   BoundResource(ResourceId id)
   {
@@ -252,6 +253,7 @@ struct BoundResource
     firstMip = -1;
     firstSlice = -1;
     typeCast = CompType::Typeless;
+    bind = 0;
   }
   BoundResource(const BoundResource &) = default;
   BoundResource &operator=(const BoundResource &) = default;
@@ -288,6 +290,9 @@ scenarios where only a small sparse subset of bound resources are actually used.
   DOCUMENT(
       "For textures, a :class:`~renderdoc.CompType` hint for how to interpret typeless textures.");
   CompType typeCast;
+
+  DOCUMENT("The offset from the bindpoint start, or 0 is the resource is not part of an array.");
+  int32_t bind;
 };
 
 DECLARE_REFLECTION_STRUCT(BoundResource);

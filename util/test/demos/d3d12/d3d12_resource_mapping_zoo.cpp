@@ -39,12 +39,12 @@ Texture2D res2 : register(t2);
 
 cbuffer consts : register(b3)
 {
-  float4 test;
+  uint4 test;
 };
 
 float4 main() : SV_Target0
 {
-  float4 color = test + float4(0.1f, 0.0f, 0.0f, 0.0f);
+  float4 color = (float4)test + float4(0.1f, 0.0f, 0.0f, 0.0f);
 	return color + res1[uint2(0, 0)] + res2[uint2(0, 0)];
 }
 
@@ -59,7 +59,7 @@ Texture2D res2 : register(t7);
 
 cbuffer consts : register(b3)
 {
-  float4 test;
+  uint4 test;
 };
 
 struct Foo
@@ -71,7 +71,7 @@ ConstantBuffer<Foo> bar[4][3] : register(b4);
 float4 main() : SV_Target0
 {
   float4 color = bar[1][2].col;
-  color += test + float4(0.1f, 0.0f, 0.0f, 0.0f);
+  color += (float4)test + float4(0.1f, 0.0f, 0.0f, 0.0f);
   return color + res1[uint2(0, 0)] + res2[uint2(0, 0)];
 }
 
@@ -83,7 +83,7 @@ Texture2DArray<float> resArray[4] : register(t10, space1);
 
 cbuffer consts : register(b3)
 {
-  float4 test;
+  uint4 test;
 };
 
 float4 main(float4 pos : SV_Position) : SV_Target0
@@ -104,7 +104,7 @@ Texture2DArray<float> resArray[] : register(t0);
 
 cbuffer consts : register(b3)
 {
-  float4 test;
+  uint4 test;
 };
 
 float4 main(float4 pos : SV_Position) : SV_Target0
@@ -193,10 +193,10 @@ float4 main(float4 pos : SV_Position) : SV_Target0
     ID3DBlobPtr psblob_resArray = Compile(pixel_resArray, "main", "ps_5_1");
     ID3DBlobPtr psblob_bindless = Compile(pixel_bindless, "main", "ps_5_1");
 
-    Vec4f cbufferdata = Vec4f(3.0f, 50.0f, 75.0f, 100.0f);
+    uint32_t cbufferdata[4] = {3, 50, 75, 100};
 
     ID3D12ResourcePtr vb = MakeBuffer().Data(DefaultTri);
-    ID3D12ResourcePtr cb = MakeBuffer().Data(&cbufferdata);
+    ID3D12ResourcePtr cb = MakeBuffer().Data(cbufferdata);
 
     AlignedCB cbufferarray[4][3];
     for(uint32_t x = 0; x < 4; ++x)
@@ -211,7 +211,13 @@ float4 main(float4 pos : SV_Position) : SV_Target0
     MakeSRV(res1).CreateGPU(56);
     ID3D12ResourcePtr res2 =
         MakeTexture(DXGI_FORMAT_R8G8B8A8_UNORM, 2, 2).Mips(1).InitialState(D3D12_RESOURCE_STATE_COPY_DEST);
-    MakeSRV(res2).CreateGPU(57);
+    D3D12ViewCreator srvRes2 = MakeSRV(res2);
+    srvRes2.CreateGPU(57);
+
+    // Litter this SRV in a bunch of other locations so that a bindless descriptor table has a lot
+    // of things to report
+    for(int i = 1024; i < 10000; ++i)
+      srvRes2.CreateGPU(i);
 
     ID3D12ResourcePtr uploadBuf = MakeBuffer().Size(1024 * 1024).Upload();
 

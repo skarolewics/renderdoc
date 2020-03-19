@@ -235,6 +235,8 @@ private:
   rdcarray<ShaderDebugState> m_States;
   size_t m_CurrentStateIdx = 0;
   rdcarray<ShaderVariable> m_Variables;
+  rdcarray<BoundResourceArray> m_ReadOnlyResources;
+  rdcarray<BoundResourceArray> m_ReadWriteResources;
   QList<int> m_Breakpoints;
 
   static const int CURRENT_MARKER = 0;

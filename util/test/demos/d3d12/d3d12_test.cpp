@@ -332,7 +332,7 @@ bool D3D12GraphicsTest::Init()
 
     m_Sampler->SetName(L"Sampler heap");
 
-    desc.NumDescriptors = 1024;
+    desc.NumDescriptors = 65535;
     desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 
     CHECK_HR(dev->CreateDescriptorHeap(&desc, __uuidof(ID3D12DescriptorHeap), (void **)&m_CBVUAVSRV));

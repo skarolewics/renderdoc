@@ -302,6 +302,17 @@ For some APIs that don't distinguish by entry point, this may be empty.
 )");
   BoundCBuffer GetConstantBuffer(ShaderStage stage, uint32_t BufIdx, uint32_t ArrayIdx) const;
 
+  DOCUMENT(R"(Retrieves a specific read-only resource bound to a particular shader stage.
+
+:param ShaderStage stage: The shader stage to fetch from.
+:param uint32_t bindset: The bindset of the requested resource.
+:param uint32_t bind: The bind of the requested resource.
+:return: The requested read-only resource. An invalid `ResourceId` is provided if the
+resource cannot be found.
+:rtype: :class:`BoundResource`
+)");
+  BoundResource GetReadOnlyResource(ShaderStage stage, uint32_t bindset, uint32_t bind) const;
+
   DOCUMENT(R"(Retrieves the read-only resources bound to a particular shader stage.
 
 :param ShaderStage stage: The shader stage to fetch from.

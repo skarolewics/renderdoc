@@ -988,9 +988,14 @@ void D3D12PipelineStateViewer::setShaderState(const D3D12Pipe::Shader &stage, RD
   {
     for(int reg = 0; reg < stage.spaces[space].srvs.count(); reg++)
     {
-      addResourceRow(D3D12ViewTag(D3D12ViewTag::SRV, stage.spaces[space].spaceIndex, reg,
-                                  stage.spaces[space].srvs[reg]),
-                     &stage, resources);
+      // Omit large table entries without a resource bound
+      const D3D12Pipe::View &view = stage.spaces[space].srvs[reg];
+      bool addRow = !view.largeTableEntry || view.resourceId != ResourceId();
+      if(addRow)
+      {
+        addResourceRow(D3D12ViewTag(D3D12ViewTag::SRV, stage.spaces[space].spaceIndex, reg, view),
+                       &stage, resources);
+      }
     }
   }
   resources->clearSelection();
@@ -1004,9 +1009,14 @@ void D3D12PipelineStateViewer::setShaderState(const D3D12Pipe::Shader &stage, RD
   {
     for(int reg = 0; reg < stage.spaces[space].uavs.count(); reg++)
     {
-      addResourceRow(D3D12ViewTag(D3D12ViewTag::UAV, stage.spaces[space].spaceIndex, reg,
-                                  stage.spaces[space].uavs[reg]),
-                     &stage, uavs);
+      // Omit large table entries without a resource bound
+      const D3D12Pipe::View &view = stage.spaces[space].uavs[reg];
+      bool addRow = !view.largeTableEntry || view.resourceId != ResourceId();
+      if(addRow)
+      {
+        addResourceRow(D3D12ViewTag(D3D12ViewTag::UAV, stage.spaces[space].spaceIndex, reg, view),
+                       &stage, uavs);
+      }
     }
   }
   uavs->clearSelection();

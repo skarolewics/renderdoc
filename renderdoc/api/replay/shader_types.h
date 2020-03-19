@@ -602,6 +602,11 @@ a different debug variable.
 )");
   rdcarray<SourceVariableMapping> sourceVars;
 
+  DOCUMENT(R"(A list of :class:`SourceVariableMapping` indicating which resources have been
+accessed by this state.
+)");
+  rdcarray<SourceVariableMapping> accessedResources;
+
   DOCUMENT(R"(A ``list`` of ``str`` with each function call in the current callstack at this line.
 
 The oldest/outer function is first in the list, the newest/inner function is last.

@@ -65,12 +65,17 @@ struct Following
   bool operator!=(const Following &o);
   static void GetDrawContext(ICaptureContext &ctx, bool &copy, bool &clear, bool &compute);
 
-  int GetHighestMip(ICaptureContext &ctx);
-  int GetFirstArraySlice(ICaptureContext &ctx);
-  CompType GetTypeHint(ICaptureContext &ctx);
+  int GetHighestMip(ICaptureContext &ctx, const rdcarray<BoundResourceArray> &readOnly,
+                    const rdcarray<BoundResourceArray> &readWrite);
+  int GetFirstArraySlice(ICaptureContext &ctx, const rdcarray<BoundResourceArray> &readOnly,
+                         const rdcarray<BoundResourceArray> &readWrite);
+  CompType GetTypeHint(ICaptureContext &ctx, const rdcarray<BoundResourceArray> &readOnly,
+                       const rdcarray<BoundResourceArray> &readWrite);
 
-  ResourceId GetResourceId(ICaptureContext &ctx);
-  BoundResource GetBoundResource(ICaptureContext &ctx, int arrayIdx);
+  ResourceId GetResourceId(ICaptureContext &ctx, const rdcarray<BoundResourceArray> &readOnly,
+                           const rdcarray<BoundResourceArray> &readWrite);
+  BoundResource GetBoundResource(ICaptureContext &ctx, const rdcarray<BoundResourceArray> &readOnly,
+                                 const rdcarray<BoundResourceArray> &readWrite, int arrayIdx);
 
   static rdcarray<BoundResource> GetOutputTargets(ICaptureContext &ctx);
 
@@ -329,6 +334,9 @@ private:
   TextureDescription *m_CachedTexture;
   Following m_Following = Following::Default;
   QMap<ResourceId, TexSettings> m_TextureSettings;
+
+  rdcarray<BoundResourceArray> m_ReadOnlyResources;
+  rdcarray<BoundResourceArray> m_ReadWriteResources;
 
   QTime m_CustomShaderTimer;
   int m_CustomShaderWriteTime = 0;
