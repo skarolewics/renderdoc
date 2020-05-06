@@ -231,6 +231,19 @@
               </widget>
             </item>
             <item>
+              <widget class="QCheckBox" name="resources_showAll">
+                <property name="toolTip">
+                  <string>Show all accessed resources</string>
+                </property>
+                <property name="text">
+                  <string>Show All</string>
+                </property>
+                <property name="enabled">
+                  <bool>true</bool>
+                </property>
+              </widget>
+            </item>
+            <item>
               <spacer name="resources_horizontalSpacer">
                 <property name="orientation">
                   <enum>Qt::Horizontal</enum>
