@@ -2315,7 +2315,7 @@ void ShaderViewer::updateAccessedResources()
             break;
           }
         }
-        if(!accessed)
+        if(!accessed && !m_AccessedResourceShowAll)
           continue;
 
         bool modified = false;
@@ -2333,6 +2333,9 @@ void ShaderViewer::updateAccessedResources()
             makeAccessedResourceNode(m_AccessedResources[i].resource, modified);
         if(resourceNode)
         {
+          if(!accessed)
+            resourceNode->setForegroundColor(QColor(Qt::gray));
+
           // Add a child for each step that it was accessed
           for(size_t j = 0; j < m_AccessedResources[i].steps.size(); ++j)
           {
@@ -2345,6 +2348,8 @@ void ShaderViewer::updateAccessedResources()
                   AccessedResourceTag((uint32_t)m_AccessedResources[i].steps[j])));
               if(m_CurrentStateIdx == m_AccessedResources[i].steps[j])
                 stepNode->setForegroundColor(QColor(Qt::red));
+              else if(!accessed)
+                stepNode->setForegroundColor(QColor(Qt::gray));
               resourceNode->addChild(stepNode);
             }
           }
@@ -2375,7 +2380,7 @@ void ShaderViewer::updateAccessedResources()
         for(size_t j = 0; j < m_AccessedResources[i].steps.size(); ++j)
         {
           bool accessed = m_AccessedResources[i].steps[j] <= m_CurrentStateIdx;
-          if(accessed)
+          if(accessed || m_AccessedResourceShowAll)
           {
             int32_t nodeIdx = -1;
             for(int32_t k = 0; k < stepNodes.count(); ++k)
@@ -2389,6 +2394,8 @@ void ShaderViewer::updateAccessedResources()
 
             RDTreeWidgetItem *resourceNode =
                 makeAccessedResourceNode(m_AccessedResources[i].resource, modified);
+            if(!accessed && !modified)
+              resourceNode->setForegroundColor(QColor(Qt::gray));
 
             if(nodeIdx == -1)
             {
@@ -2398,6 +2405,8 @@ void ShaderViewer::updateAccessedResources()
                   AccessedResourceTag((uint32_t)m_AccessedResources[i].steps[j])));
               if(m_CurrentStateIdx == m_AccessedResources[i].steps[j])
                 stepNode->setForegroundColor(QColor(Qt::red));
+              else if(!accessed)
+                stepNode->setForegroundColor(QColor(Qt::gray));
               stepNode->addChild(resourceNode);
               stepNodes.push_back({m_AccessedResources[i].steps[j], stepNode});
             }
@@ -4735,6 +4744,22 @@ void ShaderViewer::on_resources_sortByResource_clicked()
   m_AccessedResourceView = AccessedResourceView::SortByResource;
   ui->resources_sortByResource->setChecked(true);
   ui->resources_sortByStep->setChecked(false);
+  updateAccessedResources();
+}
+
+void ShaderViewer::on_resources_showAll_clicked()
+{
+  m_AccessedResourceShowAll = ui->resources_showAll->isChecked();
+  if(m_AccessedResourceShowAll && !m_AccessedResourceShowAllPopulated)
+  {
+    // The first time that the checkbox is selected, run to the end of the shader
+    // and then back to the current instruction, to ensure all accessed resources
+    // have been gathered
+    size_t curInstr = m_CurrentStateIdx;
+    runTo({}, true);
+    runTo({curInstr}, false);
+    m_AccessedResourceShowAllPopulated = true;
+  }
   updateAccessedResources();
 }
 
