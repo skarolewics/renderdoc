@@ -142,6 +142,7 @@ private slots:
 
   void on_resources_sortByStep_clicked();
   void on_resources_sortByResource_clicked();
+  void on_resources_showAll_clicked();
 
   void on_watch_itemChanged(QTableWidgetItem *item);
 
@@ -276,6 +277,8 @@ private:
 
   rdcarray<AccessedResourceData> m_AccessedResources;
   AccessedResourceView m_AccessedResourceView = AccessedResourceView::SortByResource;
+  bool m_AccessedResourceShowAll = false;
+  bool m_AccessedResourceShowAllPopulated = false;
 
   rdcarray<BoundResourceArray> m_ReadOnlyResources;
   rdcarray<BoundResourceArray> m_ReadWriteResources;
