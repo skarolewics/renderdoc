@@ -1,4 +1,4 @@
-@ECHO OFF
+REM @ECHO OFF
 
 REM Command file for Sphinx documentation
 
@@ -135,11 +135,11 @@ if "%1" == "htmlhelp" (
                goto end
        )
 	echo.
-	echo.Build finished; now you can run HTML Help Workshop with the ^
-.hhp project file in %BUILDDIR%/htmlhelp.
-	echo.For future, you can either install HTML Help Workshop to the ^
-default path [C:\Program Files (x86)\HTML Help Workshop] or ^
-set the variable HHCBUILD to the path to hhc.exe.
+	echo."Build finished; now you can run HTML Help Workshop with the "
+	echo.".hhp project file in %BUILDDIR%/htmlhelp."
+	echo."For future, you can either install HTML Help Workshop to the"
+	echo."default path [C:\Program Files (x86)\HTML Help Workshop] or "
+	echo."set the variable HHCBUILD to the path to hhc.exe."
 	goto end
 )
 
