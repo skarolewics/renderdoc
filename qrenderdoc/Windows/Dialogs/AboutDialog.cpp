@@ -45,7 +45,7 @@ AboutDialog::AboutDialog(QWidget *parent) : QDialog(parent), ui(new Ui::AboutDia
   {
     ui->version->setText(QFormatStr("Version %1 (built from <a href='%2'>%3</a>)")
                              .arg(lit(FULL_VERSION_STRING))
-                             .arg(lit("https://github.com/baldurk/renderdoc/commit/%1").arg(hash))
+                             .arg(lit("https://github.com/skarolewics/renderdoc/commit/%1").arg(hash))
                              .arg(hash.left(8)));
   }
 
