@@ -23,8 +23,12 @@
  ******************************************************************************/
 
 #include "d3d12_command_queue.h"
+#include "core/settings.h"
 #include "d3d12_command_list.h"
 #include "d3d12_resources.h"
+
+RDOC_CONFIG(bool, D3D12_HideCmdListEvents, false,
+            "When true, hides command list close or reset events in the event browser.");
 
 template <typename SerialiserType>
 bool WrappedID3D12CommandQueue::Serialise_UpdateTileMappings(
@@ -181,15 +185,18 @@ bool WrappedID3D12CommandQueue::Serialise_ExecuteCommandLists(SerialiserType &se
 
         // add a fake marker
         DrawcallDescription draw;
-        draw.name =
-            StringFormat::Fmt("=> %s[%u]: Reset(%s)", basename.c_str(), c, ToStr(cmd).c_str());
-        draw.flags = DrawFlags::PassBoundary | DrawFlags::BeginPass;
-        m_Cmd.AddEvent();
+        if(!D3D12_HideCmdListEvents())
+        {
+          draw.name =
+              StringFormat::Fmt("=> %s[%u]: Reset(%s)", basename.c_str(), c, ToStr(cmd).c_str());
+          draw.flags = DrawFlags::PassBoundary | DrawFlags::BeginPass;
+          m_Cmd.AddEvent();
 
-        m_Cmd.m_RootEvents.back().chunkIndex = cmdListInfo.beginChunk;
-        m_Cmd.m_Events.back().chunkIndex = cmdListInfo.beginChunk;
+          m_Cmd.m_RootEvents.back().chunkIndex = cmdListInfo.beginChunk;
+          m_Cmd.m_Events.back().chunkIndex = cmdListInfo.beginChunk;
 
-        m_Cmd.AddDrawcall(draw, true);
+          m_Cmd.AddDrawcall(draw, true);
+        }
         m_Cmd.m_RootEventID++;
 
         // insert the baked command list in-line into this list of notes, assigning new event and
@@ -218,15 +225,18 @@ bool WrappedID3D12CommandQueue::Serialise_ExecuteCommandLists(SerialiserType &se
         m_Cmd.m_RootEventID += cmdListInfo.eventCount;
         m_Cmd.m_RootDrawcallID += cmdListInfo.drawCount;
 
-        draw.name =
-            StringFormat::Fmt("=> %s[%u]: Close(%s)", basename.c_str(), c, ToStr(cmd).c_str());
-        draw.flags = DrawFlags::PassBoundary | DrawFlags::EndPass;
-        m_Cmd.AddEvent();
+        if(!D3D12_HideCmdListEvents())
+        {
+          draw.name =
+              StringFormat::Fmt("=> %s[%u]: Close(%s)", basename.c_str(), c, ToStr(cmd).c_str());
+          draw.flags = DrawFlags::PassBoundary | DrawFlags::EndPass;
+          m_Cmd.AddEvent();
 
-        m_Cmd.m_RootEvents.back().chunkIndex = cmdListInfo.endChunk;
-        m_Cmd.m_Events.back().chunkIndex = cmdListInfo.endChunk;
+          m_Cmd.m_RootEvents.back().chunkIndex = cmdListInfo.endChunk;
+          m_Cmd.m_Events.back().chunkIndex = cmdListInfo.endChunk;
 
-        m_Cmd.AddDrawcall(draw, true);
+          m_Cmd.AddDrawcall(draw, true);
+        }
         m_Cmd.m_RootEventID++;
       }
 
